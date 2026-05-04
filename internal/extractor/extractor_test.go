@@ -35,13 +35,9 @@ func TestExtractPositiveFromPromptData(t *testing.T) {
 	processed := make(map[string]struct{})
 	prompts := ExtractPositiveFromPromptData(promptData, processed)
 
-	// In prompt data, without titles, we check if it starts with "negative"
-	// "a cute cat" is positive. "ugly" doesn't start with "negative" but we might need more heuristic.
-	// The Python code: is_negative = ('negative' in str(text_content).lower()[:50])
-	// "ugly" does not have "negative" in it. So it might be included if not careful.
-	// Actually, "ugly" is just a short text.
-	
-	assert.Len(t, prompts, 2) // Both might be included if they don't have "negative"
+	assert.Len(t, prompts, 1)
+	assert.Equal(t, "a cute cat", prompts[0].Text)
+	assert.Equal(t, "6", prompts[0].NodeID)
 }
 
 func TestIsValidPromptText(t *testing.T) {

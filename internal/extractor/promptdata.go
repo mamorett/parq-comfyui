@@ -53,6 +53,27 @@ func ResolveNodeReference(nodeRef interface{}, promptData map[string]interface{}
 func ExtractPositiveFromPromptData(promptData map[string]interface{}, processedNodes map[string]struct{}) []PromptEntry {
 	var positivePrompts []PromptEntry
 
+	// Step 1: Identify nodes that are explicitly linked to "negative" inputs of samplers or conditioning nodes
+	negativeNodeIDs := make(map[string]struct{})
+	for _, v := range promptData {
+		node, ok := v.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		inputs, ok := node["inputs"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		for inputName, inputVal := range inputs {
+			inputNameLower := strings.ToLower(inputName)
+			if strings.Contains(inputNameLower, "negative") {
+				traceNegativeConditioning(inputVal, promptData, negativeNodeIDs, 0)
+			}
+		}
+	}
+
 	for nodeID, v := range promptData {
 		node, ok := v.(map[string]interface{})
 		if !ok {
@@ -99,7 +120,27 @@ func ExtractPositiveFromPromptData(promptData map[string]interface{}, processedN
 			}
 
 			if strings.TrimSpace(textContent) != "" && IsValidPromptText(textContent) {
-				isNegative := strings.HasPrefix(strings.ToLower(strings.TrimSpace(textContent)), "negative")
+				textContentLower := strings.ToLower(strings.TrimSpace(textContent))
+				
+				// Check for negative prompt indicators in the text itself
+				isNegative := strings.HasPrefix(textContentLower, "negative") ||
+					strings.Contains(textContentLower, "negative prompt")
+
+				// Check _meta for title if available
+				if meta, ok := node["_meta"].(map[string]interface{}); ok {
+					if title, ok := meta["title"].(string); ok {
+						titleLower := strings.ToLower(title)
+						if strings.Contains(titleLower, "negative") || strings.Contains(titleLower, "neg") {
+							isNegative = true
+						}
+					}
+				}
+
+				// Check if this node was traced back from a negative input
+				if _, ok := negativeNodeIDs[nodeID]; ok {
+					isNegative = true
+				}
+
 				if !isNegative {
 					positivePrompts = append(positivePrompts, PromptEntry{
 						Text:     textContent,
@@ -114,4 +155,37 @@ func ExtractPositiveFromPromptData(promptData map[string]interface{}, processedN
 	}
 
 	return positivePrompts
+}
+
+// traceNegativeConditioning traces back from a negative input to find all contributing CLIPTextEncode nodes
+func traceNegativeConditioning(val interface{}, promptData map[string]interface{}, negativeNodeIDs map[string]struct{}, depth int) {
+	if depth > 20 {
+		return
+	}
+
+	ref, ok := val.([]interface{})
+	if !ok || len(ref) != 2 {
+		return
+	}
+
+	nodeID := fmt.Sprintf("%v", ref[0])
+	negativeNodeIDs[nodeID] = struct{}{}
+
+	node, ok := promptData[nodeID].(map[string]interface{})
+	if !ok {
+		return
+	}
+
+	classType, _ := node["class_type"].(string)
+	inputs, ok := node["inputs"].(map[string]interface{})
+	if !ok {
+		return
+	}
+
+	// Trace through conditioning nodes
+	if strings.Contains(classType, "Conditioning") {
+		for _, inputVal := range inputs {
+			traceNegativeConditioning(inputVal, promptData, negativeNodeIDs, depth+1)
+		}
+	}
 }

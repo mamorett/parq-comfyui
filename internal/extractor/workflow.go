@@ -94,6 +94,7 @@ func ExtractPositiveFromWorkflow(workflowData map[string]interface{}, processedN
 
 			promptTextLower := strings.ToLower(promptText)
 
+			// Heuristic-based detection (fallback for workflow since graph tracing is complex with link IDs)
 			isPositive := strings.Contains(titleLower, "positive") ||
 				strings.Contains(titleLower, "pos") ||
 				(title == "" && !strings.HasPrefix(promptTextLower, "negative")) ||
@@ -101,7 +102,8 @@ func ExtractPositiveFromWorkflow(workflowData map[string]interface{}, processedN
 
 			isNegative := strings.Contains(titleLower, "negative") ||
 				strings.Contains(titleLower, "neg") ||
-				strings.HasPrefix(strings.TrimSpace(promptTextLower), "negative")
+				strings.HasPrefix(strings.TrimSpace(promptTextLower), "negative") ||
+				strings.Contains(promptTextLower, "negative prompt")
 
 			if isPositive && !isNegative {
 				positivePrompts = append(positivePrompts, PromptEntry{
