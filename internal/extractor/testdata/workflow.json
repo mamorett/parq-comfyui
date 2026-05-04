@@ -1,0 +1,16 @@
+{
+  "nodes": [
+    {
+      "id": 1,
+      "type": "CLIPTextEncode",
+      "title": "Positive Prompt",
+      "widgets_values": ["a beautiful landscape"]
+    },
+    {
+      "id": 2,
+      "type": "CLIPTextEncode",
+      "title": "Negative Prompt",
+      "widgets_values": ["blurry, low quality"]
+    }
+  ]
+}
