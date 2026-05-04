@@ -1,6 +1,6 @@
 # 🎨 parq-comfyui
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/trithemius/parq-comfyui)](https://goreportcard.com/report/github.com/trithemius/parq-comfyui)
+[![Go Report Card](https://goreportcard.com/badge/github.com/mamorett/parq-comfyui)](https://goreportcard.com/report/github.com/mamorett/parq-comfyui)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **parq-comfyui** is a high-performance Go-based utility designed to extract positive prompts and metadata from ComfyUI and Automatic1111 generated PNG files and store them in a structured Parquet database.
@@ -48,7 +48,7 @@ Running `godelinit` in a project root will add the `godelw` script and the `gode
 ### 🏗 Building from Source
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/trithemius/parq-comfyui.git
+   git clone https://github.com/mamorett/parq-comfyui.git
    cd parq-comfyui
    ```
 
