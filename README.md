@@ -21,18 +21,42 @@ Built for efficiency, it handles large datasets of images with ease, resolving c
 
 ---
 
-## 🛠 Installation
+## 🛠 Installation & Setup
 
-### From Source
-Requires Go 1.23+ and [gödel](https://github.com/palantir/godel).
+### Prerequisites
+- **Go**: Version 1.24+ is recommended (as specified in `go.mod`). [Download Go](https://go.dev/doc/install).
 
+### 🛠 Installing gödel
+This project uses [gödel](https://github.com/palantir/godel), a powerful build tool for Go. You have two options for using it:
+
+#### 1. Using the project wrapper (Recommended)
+You do not need to install gödel globally. The repository includes a `godelw` (gödel wrapper) script that automatically downloads and manages the correct version of gödel for this project.
+
+To initialize gödel and check the version:
 ```bash
-git clone https://github.com/trithemius/parq-comfyui.git
-cd parq-comfyui
-./godelw build
+chmod +x godelw
+./godelw version
 ```
 
-The binaries will be available in `out/build/parq-comfyui/unspecified/`.
+#### 2. Installing the gödel CLI (Optional)
+If you wish to use gödel in your own projects, you can install the `godelinit` tool to set up the wrapper in any repository:
+```bash
+go install github.com/palantir/godel/v2/godelinit@latest
+```
+Running `godelinit` in a project root will add the `godelw` script and the `godel/` configuration directory.
+
+### 🏗 Building from Source
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/trithemius/parq-comfyui.git
+   cd parq-comfyui
+   ```
+
+2. **Build the application:**
+   ```bash
+   ./godelw build
+   ```
+   The compiled binaries will be available in `out/build/parq-comfyui/unspecified/`.
 
 ---
 
