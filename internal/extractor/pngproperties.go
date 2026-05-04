@@ -8,7 +8,6 @@ import (
 func ExtractPositiveFromPNGProperties(metadata map[string]string) string {
 	candidateKeys := []string{
 		"parameters",
-		"prompt",
 		"positive",
 		"positive_prompt",
 		"description",

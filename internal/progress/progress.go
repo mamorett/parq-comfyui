@@ -35,7 +35,14 @@ func NewProgressBar(total int, description string) *ProgressBar {
 // UpdateWithStatus updates the progress bar with a status message
 func (pb *ProgressBar) UpdateWithStatus(status string) {
 	_ = pb.bar.Add(1)
-	pb.bar.Describe(status)
+	if status != "" {
+		pb.bar.Describe(status)
+	}
+}
+
+// Increment just increments the progress bar
+func (pb *ProgressBar) Increment() {
+	_ = pb.bar.Add(1)
 }
 
 // Describe sets the description

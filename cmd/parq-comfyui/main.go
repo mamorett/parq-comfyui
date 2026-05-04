@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/trithemius/parq-comfyui/internal/collector"
@@ -16,45 +17,59 @@ import (
 )
 
 var (
-	inputFlag         = flag.String("input", "", "Input: directory, single file, or glob pattern")
-	inputShortFlag    = flag.String("i", "", "Input: directory, single file, or glob pattern (shorthand)")
-	fileListFlag      = flag.String("file-list", "", "Text file containing list of image paths")
-	fileListShortFlag = flag.String("f", "", "Text file containing list of image paths (shorthand)")
-	directoryFlag     = flag.String("directory", "", "[DEPRECATED] Use --input instead")
-	directoryShortFlag = flag.String("d", "", "[DEPRECATED] Use --input instead (shorthand)")
-	databaseFlag      = flag.String("database", "", "Path to Parquet database file (required)")
-	dbFlag            = flag.String("db", "", "Path to Parquet database file (shorthand)")
-	overrideFlag      = flag.Bool("override", false, "Override existing entries in database")
-	useParametersFlag = flag.Bool("use-parameters", false, "Use A1111/parameters-style extraction")
-	recursiveFlag     = flag.Bool("recursive", false, "Recursively search for images")
-	recursiveShortFlag = flag.Bool("r", false, "Recursively search for images (shorthand)")
+	input         string
+	fileList      string
+	database      string
+	override      bool
+	useParameters bool
+	usePrompt     bool
+	recursive     bool
 )
+
+func init() {
+	flag.StringVar(&input, "input", "", "Input: directory, single file, or glob pattern")
+	flag.StringVar(&input, "i", "", "Input (shorthand)")
+	flag.StringVar(&fileList, "file-list", "", "Text file containing list of image paths")
+	flag.StringVar(&fileList, "f", "", "Text file (shorthand)")
+	flag.StringVar(&database, "database", "", "Path to Parquet database file (required)")
+	flag.StringVar(&database, "db", "", "Database (shorthand)")
+	flag.BoolVar(&override, "override", false, "Override existing entries in database")
+	flag.BoolVar(&useParameters, "use-parameters", false, "Use A1111/parameters-style extraction")
+	flag.BoolVar(&usePrompt, "use-prompt", false, "Use ComfyUI prompt/workflow extraction (default)")
+	flag.BoolVar(&recursive, "recursive", false, "Recursively search for images")
+	flag.BoolVar(&recursive, "r", false, "Recursive (shorthand)")
+
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage of parq-comfyui:\n\n")
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		fmt.Fprintf(os.Stderr, "  -i, --input <path>      Input: directory, single file, or glob pattern\n")
+		fmt.Fprintf(os.Stderr, "  -f, --file-list <path>  Text file containing list of image paths\n")
+		fmt.Fprintf(os.Stderr, "  -db, --database <path>  Path to Parquet database file (required)\n")
+		fmt.Fprintf(os.Stderr, "  -r, --recursive         Recursively search for images\n")
+		fmt.Fprintf(os.Stderr, "  --override              Override existing entries in database\n")
+		fmt.Fprintf(os.Stderr, "  --use-parameters        A1111-style parameters extraction\n")
+		fmt.Fprintf(os.Stderr, "  --use-prompt            ComfyUI-style extraction (default)\n\n")
+		fmt.Fprintf(os.Stderr, "Examples:\n")
+		fmt.Fprintf(os.Stderr, "  parq-comfyui -i ./renders -db prompts.parquet\n")
+		fmt.Fprintf(os.Stderr, "  parq-comfyui -i \"*.png\" --db prompts.parquet --use-parameters\n")
+	}
+}
+
+type appState struct {
+	db              *parquet.ParquetDB
+	newEntries      []parquet.Entry
+	mu              sync.Mutex
+	successCount    int
+	errorCount      int
+	skippedCount    int
+	noPromptCount   int
+	skippedNoParam  int
+	databasePath    string
+	overrideEnabled bool
+}
 
 func main() {
 	flag.Parse()
-
-	input := *inputFlag
-	if input == "" {
-		input = *inputShortFlag
-	}
-	if input == "" {
-		input = *directoryFlag
-	}
-	if input == "" {
-		input = *directoryShortFlag
-	}
-
-	fileList := *fileListFlag
-	if fileList == "" {
-		fileList = *fileListShortFlag
-	}
-
-	database := *databaseFlag
-	if database == "" {
-		database = *dbFlag
-	}
-
-	recursive := *recursiveFlag || *recursiveShortFlag
 
 	if database == "" {
 		fmt.Println("✗ Error: --database is required")
@@ -65,6 +80,11 @@ func main() {
 	if input == "" && fileList == "" {
 		fmt.Println("✗ Error: --input or --file-list is required")
 		flag.Usage()
+		os.Exit(1)
+	}
+
+	if useParameters && usePrompt {
+		fmt.Println("✗ Error: --use-parameters and --use-prompt are mutually exclusive")
 		os.Exit(1)
 	}
 
@@ -87,27 +107,33 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println("ComfyUI Prompt Extractor (Go)")
+	state := &appState{
+		db:              db,
+		databasePath:    database,
+		overrideEnabled: override,
+	}
+
+	fmt.Println("🎨 parq-comfyui (Go)")
 	fmt.Printf("Input: %s\n", input)
 	if fileList != "" {
 		fmt.Printf("File list: %s\n", fileList)
 	}
 	fmt.Printf("Parquet database: %s\n", database)
 	fmt.Printf("Existing entries in database: %d\n", len(db.Entries))
-	fmt.Printf("Override existing: %v\n", *overrideFlag)
+	fmt.Printf("Override existing: %v\n", override)
 	fmt.Println("\n💡 Tip: Press Ctrl-C anytime to save progress and exit gracefully")
 	fmt.Println(strings.Repeat("-", 60))
 
 	fmt.Printf("Found %d PNG file(s) total\n", len(allImageFiles))
 
 	var imagesToProcess []string
-	existingEntries := make(map[string]parquet.Entry)
+	existingEntriesMap := make(map[string]parquet.Entry)
 
 	for _, img := range allImageFiles {
 		if db.Exists(img) {
-			if *overrideFlag {
+			if override {
 				entry, _ := db.GetEntry(img)
-				existingEntries[img] = entry
+				existingEntriesMap[img] = entry
 				imagesToProcess = append(imagesToProcess, img)
 			}
 		} else {
@@ -115,9 +141,9 @@ func main() {
 		}
 	}
 
-	skippedCount := len(allImageFiles) - len(imagesToProcess)
-	if skippedCount > 0 {
-		fmt.Printf("Skipping %d image(s) already in database\n", skippedCount)
+	state.skippedCount = len(allImageFiles) - len(imagesToProcess)
+	if state.skippedCount > 0 {
+		fmt.Printf("Skipping %d image(s) already in database\n", state.skippedCount)
 	}
 
 	if len(imagesToProcess) == 0 {
@@ -131,33 +157,30 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt)
 
-	var newEntries []parquet.Entry
-	successCount := 0
-	errorCount := 0
-	noPromptCount := 0
-
 	pb := progress.NewProgressBar(len(imagesToProcess), "Processing images")
 
 	go func() {
 		<-sigChan
 		fmt.Println("\n\n⚠ Interrupt received (Ctrl-C). Saving progress...")
-		if len(newEntries) > 0 {
-			db.AddEntries(newEntries, *overrideFlag)
-			if err := db.Save(database); err != nil {
-				fmt.Printf("✗ Error saving database: %v\n", err)
-			} else {
-				fmt.Printf("✓ Progress saved: %d new entries added\n", len(newEntries))
-			}
-		}
-		os.Exit(0)
+		state.saveAndExit()
 	}()
 
 	for _, imagePath := range imagesToProcess {
-		result, err := extractor.Extract(imagePath, *useParametersFlag)
+		result, err := extractor.Extract(imagePath, useParameters)
 		if err != nil {
-			errorCount++
+			state.mu.Lock()
+			state.errorCount++
+			state.mu.Unlock()
 			pb.Describe(fmt.Sprintf("✗ %s: %v", filepath.Base(imagePath), err))
-			pb.UpdateWithStatus(fmt.Sprintf("✗ %s", filepath.Base(imagePath)))
+			pb.Increment()
+			continue
+		}
+
+		if useParameters && len(result.PositivePrompts) == 0 {
+			state.mu.Lock()
+			state.skippedNoParam++
+			state.mu.Unlock()
+			pb.UpdateWithStatus(fmt.Sprintf("SKIP %s", filepath.Base(imagePath)))
 			continue
 		}
 
@@ -171,7 +194,9 @@ func main() {
 		}
 
 		if promptText == "" {
-			noPromptCount++
+			state.mu.Lock()
+			state.noPromptCount++
+			state.mu.Unlock()
 		}
 
 		now := time.Now()
@@ -182,38 +207,57 @@ func main() {
 			CreatedAt:   now,
 		}
 
-		if existing, ok := existingEntries[imagePath]; ok {
+		if existing, ok := existingEntriesMap[imagePath]; ok {
 			entry.CreatedAt = existing.CreatedAt
 			entry.ModifiedAt = &now
 		}
 
-		newEntries = append(newEntries, entry)
-		successCount++
+		state.mu.Lock()
+		state.newEntries = append(state.newEntries, entry)
+		state.successCount++
+		state.mu.Unlock()
+		
 		pb.UpdateWithStatus(fmt.Sprintf("✓ %s", filepath.Base(imagePath)))
 	}
 
 	pb.Finish()
-
 	fmt.Println("\nSaving results to database...")
-	db.AddEntries(newEntries, *overrideFlag)
-	if err := db.Save(database); err != nil {
-		fmt.Printf("✗ Error saving database: %v\n", err)
+	state.saveAndExit()
+}
+
+func (s *appState) saveAndExit() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if len(s.newEntries) > 0 {
+		s.db.AddEntries(s.newEntries, s.overrideEnabled)
+		if err := s.db.Save(); err != nil {
+			fmt.Printf("✗ Error saving database: %v\n", err)
+			os.Exit(1)
+		} else {
+			fmt.Printf("✓ Database updated: %s\n", s.databasePath)
+			fmt.Printf("  New entries added: %d\n", len(s.newEntries))
+			fmt.Printf("  Total entries in database: %d\n", len(s.db.Entries))
+		}
 	} else {
-		fmt.Printf("✓ Database updated: %s\n", database)
-		fmt.Printf("  New entries added: %d\n", len(newEntries))
-		fmt.Printf("  Total entries in database: %d\n", len(db.Entries))
+		fmt.Println("⊘ No new entries to save.")
 	}
 
 	fmt.Println(strings.Repeat("-", 60))
 	fmt.Println("Processing complete!")
-	fmt.Printf("✓ Successfully processed: %d\n", successCount)
-	if noPromptCount > 0 {
-		fmt.Printf("⚠ Images with no prompts found: %d\n", noPromptCount)
+	fmt.Printf("✓ Successfully processed: %d\n", s.successCount)
+	if s.noPromptCount > 0 {
+		fmt.Printf("⚠ Images with no prompts found: %d\n", s.noPromptCount)
 	}
-	if errorCount > 0 {
-		fmt.Printf("✗ Errors: %d\n", errorCount)
+	if s.skippedNoParam > 0 {
+		fmt.Printf("✓ Images skipped (no parameters found): %d\n", s.skippedNoParam)
 	}
-	if skippedCount > 0 {
-		fmt.Printf("⊘ Skipped (already in database): %d\n", skippedCount)
+	if s.errorCount > 0 {
+		fmt.Printf("✗ Errors: %d\n", s.errorCount)
 	}
+	if s.skippedCount > 0 {
+		fmt.Printf("⊘ Skipped (already in database): %d\n", s.skippedCount)
+	}
+	
+	os.Exit(0)
 }
