@@ -166,13 +166,15 @@ func main() {
 	}()
 
 	for _, imagePath := range imagesToProcess {
+		baseName := filepath.Base(imagePath)
+		pb.Describe(baseName)
+
 		result, err := extractor.Extract(imagePath, useParameters)
 		if err != nil {
 			state.mu.Lock()
 			state.errorCount++
 			state.mu.Unlock()
-			pb.Describe(fmt.Sprintf("✗ %s: %v", filepath.Base(imagePath), err))
-			pb.Increment()
+			pb.UpdateWithStatus(fmt.Sprintf("✗ %s: %v", baseName, err))
 			continue
 		}
 
@@ -180,7 +182,7 @@ func main() {
 			state.mu.Lock()
 			state.skippedNoParam++
 			state.mu.Unlock()
-			pb.UpdateWithStatus(fmt.Sprintf("SKIP %s", filepath.Base(imagePath)))
+			pb.UpdateWithStatus(fmt.Sprintf("SKIP %s", baseName))
 			continue
 		}
 
@@ -216,8 +218,8 @@ func main() {
 		state.newEntries = append(state.newEntries, entry)
 		state.successCount++
 		state.mu.Unlock()
-		
-		pb.UpdateWithStatus(fmt.Sprintf("✓ %s", filepath.Base(imagePath)))
+
+		pb.Increment()
 	}
 
 	pb.Finish()
