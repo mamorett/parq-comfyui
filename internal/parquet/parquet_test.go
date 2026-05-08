@@ -123,6 +123,54 @@ func TestParquetSaveLoadNullable(t *testing.T) {
 	assert.True(t, now.Equal(*e1.ModifiedAt))
 }
 
+func TestRemoveMissingEntries(t *testing.T) {
+	existingFile := "/tmp/test_clean_existing.png"
+	os.Remove(existingFile)
+
+	f, err := os.Create(existingFile)
+	require.NoError(t, err)
+	f.Close()
+	defer os.Remove(existingFile)
+
+	now := time.Now().Truncate(time.Millisecond)
+	db := &ParquetDB{Path: "/tmp/test_clean.parquet"}
+	db.Entries = []Entry{
+		{ImagePath: existingFile, Prompt: "exists", CreatedAt: now},
+		{ImagePath: "/tmp/test_clean_missing.png", Prompt: "missing", CreatedAt: now},
+		{ImagePath: "/tmp/test_clean_missing2.png", Prompt: "missing2", CreatedAt: now, ModifiedAt: &now},
+	}
+	db.buildIndex()
+	assert.Len(t, db.Entries, 3)
+
+	removed := db.RemoveMissingEntries()
+	assert.Equal(t, 2, removed)
+	assert.Len(t, db.Entries, 1)
+	assert.Equal(t, existingFile, db.Entries[0].ImagePath)
+	assert.True(t, db.Exists(existingFile))
+	assert.False(t, db.Exists("/tmp/test_clean_missing.png"))
+	assert.False(t, db.Exists("/tmp/test_clean_missing2.png"))
+}
+
+func TestRemoveMissingEntriesNoneMissing(t *testing.T) {
+	existingFile := "/tmp/test_clean_none_missing.png"
+	os.Remove(existingFile)
+	f, err := os.Create(existingFile)
+	require.NoError(t, err)
+	f.Close()
+	defer os.Remove(existingFile)
+
+	now := time.Now().Truncate(time.Millisecond)
+	db := &ParquetDB{}
+	db.Entries = []Entry{
+		{ImagePath: existingFile, Prompt: "a", CreatedAt: now},
+	}
+	db.buildIndex()
+
+	removed := db.RemoveMissingEntries()
+	assert.Equal(t, 0, removed)
+	assert.Len(t, db.Entries, 1)
+}
+
 func TestParquetMultiCycle(t *testing.T) {
 	tempFile := "/tmp/test_multicycle.parquet"
 	os.Remove(tempFile)

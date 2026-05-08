@@ -83,6 +83,21 @@ func (db *ParquetDB) GetEntry(imagePath string) (Entry, bool) {
 	return db.Entries[idx], true
 }
 
+func (db *ParquetDB) RemoveMissingEntries() int {
+	var kept []Entry
+	removed := 0
+	for _, e := range db.Entries {
+		if _, err := os.Stat(e.ImagePath); os.IsNotExist(err) {
+			removed++
+		} else {
+			kept = append(kept, e)
+		}
+	}
+	db.Entries = kept
+	db.buildIndex()
+	return removed
+}
+
 func (db *ParquetDB) AddEntries(newEntries []Entry, override bool) {
 	if !override {
 		for _, e := range newEntries {
