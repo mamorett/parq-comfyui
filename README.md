@@ -77,6 +77,7 @@ parq-comfyui -i /path/to/my/renders --database prompts.parquet
 | `--file-list` | `-f` | Process files listed in a text file |
 | `--override` | | Reprocess and update existing entries in the database |
 | `--use-parameters`| | Force A1111-style parameter extraction |
+| `--clean` | | Remove entries whose image files no longer exist on disk (requires `--input` or `--file-list`) |
 
 ### Examples
 
@@ -93,6 +94,11 @@ parq-comfyui -f my_best_images.txt --db favorites.parquet
 **Overriding existing data:**
 ```bash
 parq-comfyui -i ./latest -db prompts.parquet --override
+```
+
+**Cleaning stale entries (files no longer exist):**
+```bash
+parq-comfyui -i ./renders -db prompts.parquet --clean
 ```
 
 ---

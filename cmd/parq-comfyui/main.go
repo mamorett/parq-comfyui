@@ -24,6 +24,7 @@ var (
 	useParameters bool
 	usePrompt     bool
 	recursive     bool
+	clean         bool
 )
 
 func init() {
@@ -38,6 +39,7 @@ func init() {
 	flag.BoolVar(&usePrompt, "use-prompt", false, "Use ComfyUI prompt/workflow extraction (default)")
 	flag.BoolVar(&recursive, "recursive", false, "Recursively search for images")
 	flag.BoolVar(&recursive, "r", false, "Recursive (shorthand)")
+	flag.BoolVar(&clean, "clean", false, "Remove entries whose image files no longer exist on disk")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage of parq-comfyui:\n\n")
@@ -48,7 +50,8 @@ func init() {
 		fmt.Fprintf(os.Stderr, "  -r, --recursive         Recursively search for images\n")
 		fmt.Fprintf(os.Stderr, "  --override              Override existing entries in database\n")
 		fmt.Fprintf(os.Stderr, "  --use-parameters        A1111-style parameters extraction\n")
-		fmt.Fprintf(os.Stderr, "  --use-prompt            ComfyUI-style extraction (default)\n\n")
+		fmt.Fprintf(os.Stderr, "  --use-prompt            ComfyUI-style extraction (default)\n")
+		fmt.Fprintf(os.Stderr, "  --clean                 Remove stale database entries (files no longer exist on disk)\n\n")
 		fmt.Fprintf(os.Stderr, "Examples:\n")
 		fmt.Fprintf(os.Stderr, "  parq-comfyui -i ./renders -db prompts.parquet\n")
 		fmt.Fprintf(os.Stderr, "  parq-comfyui -i \"*.png\" --db prompts.parquet --use-parameters\n")
@@ -77,14 +80,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	if input == "" && fileList == "" {
-		fmt.Println("✗ Error: --input or --file-list is required")
-		flag.Usage()
+	if useParameters && usePrompt {
+		fmt.Println("✗ Error: --use-parameters and --use-prompt are mutually exclusive")
 		os.Exit(1)
 	}
 
-	if useParameters && usePrompt {
-		fmt.Println("✗ Error: --use-parameters and --use-prompt are mutually exclusive")
+	// Validate --clean requires either file list or input path
+	if clean && input == "" && fileList == "" {
+		fmt.Println("✗ Error: --clean requires either --input or --file-list")
+		flag.Usage()
 		os.Exit(1)
 	}
 
@@ -105,6 +109,24 @@ func main() {
 	if err != nil {
 		fmt.Printf("✗ Error loading database: %v\n", err)
 		os.Exit(1)
+	}
+
+	if clean {
+		removed := db.RemoveMissingEntries()
+		if removed > 0 {
+			fmt.Printf("♻ Removed %d stale entries (files no longer exist)\n", removed)
+			if err := db.Save(); err != nil {
+				fmt.Printf("✗ Error saving after clean: %v\n", err)
+				os.Exit(1)
+			}
+		} else {
+			fmt.Println("✓ No stale entries found")
+		}
+
+		if input == "" && fileList == "" {
+			fmt.Printf("Total entries in database: %d\n", len(db.Entries))
+			return
+		}
 	}
 
 	state := &appState{
