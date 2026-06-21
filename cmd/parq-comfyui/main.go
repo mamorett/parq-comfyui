@@ -16,6 +16,18 @@ import (
 	"github.com/trithemius/parq-comfyui/internal/progress"
 )
 
+var rawAsciiArt = `    ____                           ______                      __  __  __  __
+   / __ \____ ______ ____ _       / ____/___  ____ ___  ____  / /_/ / / / / /
+  / /_/ / __ @/ ___// __ @/ ___  / /   / __ \/ __ @__ \/ __ \/ __/ / / / / / 
+ / ____/ /_/ / /   / /_/ / /___ / /___/ /_/ / / / / / / /_/ / /_/ /_/ /_/ /  
+/_/    \__,_/_/   \__,  /      \____/\____/_/ /_/ /_/ .___/\__/\____/\____/  
+                 /____/                             /_/                      `
+
+func printLogo() {
+	logo := strings.ReplaceAll(rawAsciiArt, "@", "`")
+	fmt.Printf("\033[36m%s\033[0m\n\n", logo)
+}
+
 var (
 	input         string
 	fileList      string
@@ -42,19 +54,20 @@ func init() {
 	flag.BoolVar(&clean, "clean", false, "Remove entries whose image files no longer exist on disk")
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage of parq-comfyui:\n\n")
-		fmt.Fprintf(os.Stderr, "Options:\n")
-		fmt.Fprintf(os.Stderr, "  -i, --input <path>      Input: directory, single file, or glob pattern\n")
-		fmt.Fprintf(os.Stderr, "  -f, --file-list <path>  Text file containing list of image paths\n")
-		fmt.Fprintf(os.Stderr, "  -db, --database <path>  Path to Parquet database file (required)\n")
-		fmt.Fprintf(os.Stderr, "  -r, --recursive         Recursively search for images\n")
-		fmt.Fprintf(os.Stderr, "  --override              Override existing entries in database\n")
-		fmt.Fprintf(os.Stderr, "  --use-parameters        A1111-style parameters extraction\n")
-		fmt.Fprintf(os.Stderr, "  --use-prompt            ComfyUI-style extraction (default)\n")
-		fmt.Fprintf(os.Stderr, "  --clean                 Remove stale database entries (files no longer exist on disk)\n\n")
-		fmt.Fprintf(os.Stderr, "Examples:\n")
-		fmt.Fprintf(os.Stderr, "  parq-comfyui -i ./renders -db prompts.parquet\n")
-		fmt.Fprintf(os.Stderr, "  parq-comfyui -i \"*.png\" --db prompts.parquet --use-parameters\n")
+		printLogo()
+		fmt.Fprintf(os.Stderr, "\033[1;36mUsage of parq-comfyui:\033[0m\n\n")
+		fmt.Fprintf(os.Stderr, "\033[1mOptions:\033[0m\n")
+		fmt.Fprintf(os.Stderr, "  \033[36m-i, --input\033[0m \033[33m<path>\033[0m      Input: directory, single file, or glob pattern\n")
+		fmt.Fprintf(os.Stderr, "  \033[36m-f, --file-list\033[0m \033[33m<path>\033[0m  Text file containing list of image paths\n")
+		fmt.Fprintf(os.Stderr, "  \033[36m-db, --database\033[0m \033[33m<path>\033[0m  Path to Parquet database file (\033[1;31mrequired\033[0m)\n")
+		fmt.Fprintf(os.Stderr, "  \033[36m-r, --recursive\033[0m         Recursively search for images\n")
+		fmt.Fprintf(os.Stderr, "  \033[36m--override\033[0m              Override existing entries in database\n")
+		fmt.Fprintf(os.Stderr, "  \033[36m--use-parameters\033[0m        A1111-style parameters extraction\n")
+		fmt.Fprintf(os.Stderr, "  \033[36m--use-prompt\033[0m            ComfyUI-style extraction (default)\n")
+		fmt.Fprintf(os.Stderr, "  \033[36m--clean\033[0m                 Remove stale database entries (files no longer exist on disk)\n\n")
+		fmt.Fprintf(os.Stderr, "\033[1mExamples:\033[0m\n")
+		fmt.Fprintf(os.Stderr, "  \033[90mparq-comfyui -i ./renders -db prompts.parquet\033[0m\n")
+		fmt.Fprintf(os.Stderr, "  \033[90mparq-comfyui -i \"*.png\" --db prompts.parquet --use-parameters\033[0m\n")
 	}
 }
 
@@ -75,19 +88,19 @@ func main() {
 	flag.Parse()
 
 	if database == "" {
-		fmt.Println("✗ Error: --database is required")
+		fmt.Println("\033[31m✗ Error: --database is required\033[0m")
 		flag.Usage()
 		os.Exit(1)
 	}
 
 	if useParameters && usePrompt {
-		fmt.Println("✗ Error: --use-parameters and --use-prompt are mutually exclusive")
+		fmt.Println("\033[31m✗ Error: --use-parameters and --use-prompt are mutually exclusive\033[0m")
 		os.Exit(1)
 	}
 
 	// Validate --clean requires either file list or input path
 	if clean && input == "" && fileList == "" {
-		fmt.Println("✗ Error: --clean requires either --input or --file-list")
+		fmt.Println("\033[31m✗ Error: --clean requires either --input or --file-list\033[0m")
 		flag.Usage()
 		os.Exit(1)
 	}
@@ -135,15 +148,7 @@ func main() {
 		overrideEnabled: override,
 	}
 
-	asciiArt := `    ____                           ______                      __  __  __  __
-   / __ \____ ______ ____ _       / ____/___  ____ ___  ____  / /_/ / / / / /
-  / /_/ / __ @/ ___// __ @/ ___  / /   / __ \/ __ @__ \/ __ \/ __/ / / / / / 
- / ____/ /_/ / /   / /_/ / /___ / /___/ /_/ / / / / / / /_/ / /_/ /_/ /_/ /  
-/_/    \__,_/_/   \__,  /      \____/\____/_/ /_/ /_/ .___/\__/\____/\____/  
-                 /____/                             /_/                      `
-	asciiArt = strings.ReplaceAll(asciiArt, "@", "`")
-
-	fmt.Printf("\033[36m%s\033[0m\n\n", asciiArt)
+	printLogo()
 	fmt.Printf("\033[1;36m🎨 parq-comfyui (Go)\033[0m\n")
 	fmt.Printf("\033[90mInput:\033[0m %s\n", input)
 	if fileList != "" {
