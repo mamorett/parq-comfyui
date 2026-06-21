@@ -3,9 +3,11 @@ package progress
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/schollz/progressbar/v3"
+	"golang.org/x/term"
 )
 
 // ProgressBar wrapper for terminal progress
@@ -46,6 +48,69 @@ func NewProgressBar(total int, description string) *ProgressBar {
 	}
 }
 
+func getTerminalWidth() int {
+	width, _, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil {
+		return 80 // fallback
+	}
+	return width
+}
+
+func (pb *ProgressBar) updateDescription(desc string) {
+	if time.Since(pb.lastRedraw) >= pb.throttleDuration {
+		termWidth := getTerminalWidth()
+		maxDescLen := termWidth - 55
+		if maxDescLen < 20 {
+			maxDescLen = 20
+		}
+
+		truncated := desc
+		if len(desc) > maxDescLen {
+			prefix := ""
+			content := desc
+			if strings.HasPrefix(desc, "✓ ") {
+				prefix = "✓ "
+				content = desc[2:]
+			} else if strings.HasPrefix(desc, "SKIP ") {
+				prefix = "SKIP "
+				content = desc[5:]
+			} else if strings.HasPrefix(desc, "✗ ") {
+				prefix = "✗ "
+				content = desc[2:]
+			} else if strings.HasPrefix(desc, "Processing ") {
+				prefix = "Processing "
+				content = desc[11:]
+			}
+
+			adjMaxLen := maxDescLen - len(prefix)
+			if adjMaxLen < 10 {
+				adjMaxLen = 10
+			}
+
+			if len(content) > adjMaxLen {
+				half := (adjMaxLen - 3) / 2
+				truncated = prefix + content[:half] + "..." + content[len(content)-half:]
+			} else {
+				truncated = prefix + content
+			}
+		}
+
+		colorized := truncated
+		if strings.HasPrefix(truncated, "✓ ") {
+			colorized = "[green]✓[reset] [cyan]" + truncated[2:] + "[reset]"
+		} else if strings.HasPrefix(truncated, "SKIP ") {
+			colorized = "[yellow]SKIP[reset] [cyan]" + truncated[5:] + "[reset]"
+		} else if strings.HasPrefix(truncated, "✗ ") {
+			colorized = "[red]✗[reset] [cyan]" + truncated[2:] + "[reset]"
+		} else {
+			colorized = "[cyan]" + truncated + "[reset]"
+		}
+
+		pb.bar.Describe(colorized)
+		pb.lastRedraw = time.Now()
+	}
+}
+
 // UpdateWithStatus updates the progress bar with a status message and increments
 func (pb *ProgressBar) UpdateWithStatus(status string) {
 	if status != "" {
@@ -61,16 +126,15 @@ func (pb *ProgressBar) Increment() {
 	_ = pb.bar.Add(1)
 }
 
+// IncrementWithStatus updates description and increments the progress bar
+func (pb *ProgressBar) IncrementWithStatus(status string) {
+	pb.updateDescription(status)
+	_ = pb.bar.Add(1)
+}
+
 // Describe sets the description with rate-limiting and smart truncation
 func (pb *ProgressBar) Describe(desc string) {
-	if time.Since(pb.lastRedraw) >= pb.throttleDuration {
-		truncated := desc
-		if len(desc) > 25 {
-			truncated = desc[:11] + "..." + desc[len(desc)-11:]
-		}
-		pb.bar.Describe("[cyan]⚙ " + truncated + "[reset]")
-		pb.lastRedraw = time.Now()
-	}
+	pb.updateDescription(desc)
 }
 
 // Finish finishes the progress bar
