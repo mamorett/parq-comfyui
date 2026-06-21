@@ -3,6 +3,7 @@ package progress
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/schollz/progressbar/v3"
 )
@@ -15,24 +16,25 @@ type ProgressBar struct {
 // NewProgressBar creates a new progress bar
 func NewProgressBar(total int, description string) *ProgressBar {
 	bar := progressbar.NewOptions(total,
-		progressbar.OptionSetDescription(description),
+		progressbar.OptionEnableColorCodes(true),
+		progressbar.OptionSetDescription("[cyan]⚙ " + description + "...[reset]"),
 		progressbar.OptionSetWriter(os.Stdout),
 		progressbar.OptionShowCount(),
 		progressbar.OptionShowIts(),
 		progressbar.OptionSetItsString("img/s"),
 		progressbar.OptionShowElapsedTimeOnFinish(),
-		progressbar.OptionSetPredictTime(false),
+		progressbar.OptionSetPredictTime(true),
 		progressbar.OptionOnCompletion(func() {
 			fmt.Println()
 		}),
 		progressbar.OptionSetTheme(progressbar.Theme{
-			Saucer:        "=",
-			SaucerHead:    ">",
-			SaucerPadding: " ",
-			BarStart:      "[",
-			BarEnd:        "]",
+			Saucer:        "[cyan]█[reset]",
+			SaucerHead:    "[cyan]█[reset]",
+			SaucerPadding: "░",
+			BarStart:      "[cyan]▕[reset]",
+			BarEnd:        "[cyan]▏[reset]",
 		}),
-		progressbar.OptionFullWidth(),
+		progressbar.OptionThrottle(65 * time.Millisecond),
 	)
 	return &ProgressBar{bar: bar}
 }
@@ -40,7 +42,8 @@ func NewProgressBar(total int, description string) *ProgressBar {
 // UpdateWithStatus updates the progress bar with a status message and increments
 func (pb *ProgressBar) UpdateWithStatus(status string) {
 	if status != "" {
-		pb.bar.Describe(status)
+		_ = pb.bar.Clear()
+		fmt.Println(status)
 	}
 	_ = pb.bar.Add(1)
 }
