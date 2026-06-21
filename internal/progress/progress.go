@@ -10,7 +10,9 @@ import (
 
 // ProgressBar wrapper for terminal progress
 type ProgressBar struct {
-	bar *progressbar.ProgressBar
+	bar              *progressbar.ProgressBar
+	lastRedraw       time.Time
+	throttleDuration time.Duration
 }
 
 // NewProgressBar creates a new progress bar
@@ -36,7 +38,11 @@ func NewProgressBar(total int, description string) *ProgressBar {
 		}),
 		progressbar.OptionThrottle(65 * time.Millisecond),
 	)
-	return &ProgressBar{bar: bar}
+	return &ProgressBar{
+		bar:              bar,
+		lastRedraw:       time.Unix(0, 0),
+		throttleDuration: 65 * time.Millisecond,
+	}
 }
 
 // UpdateWithStatus updates the progress bar with a status message and increments
@@ -46,6 +52,7 @@ func (pb *ProgressBar) UpdateWithStatus(status string) {
 		fmt.Println(status)
 	}
 	_ = pb.bar.Add(1)
+	pb.lastRedraw = time.Now()
 }
 
 // Increment just increments the progress bar
@@ -55,7 +62,10 @@ func (pb *ProgressBar) Increment() {
 
 // Describe sets the description without incrementing
 func (pb *ProgressBar) Describe(desc string) {
-	pb.bar.Describe(desc)
+	if time.Since(pb.lastRedraw) >= pb.throttleDuration {
+		pb.bar.Describe("[cyan]⚙ " + desc + "[reset]")
+		pb.lastRedraw = time.Now()
+	}
 }
 
 // Finish finishes the progress bar

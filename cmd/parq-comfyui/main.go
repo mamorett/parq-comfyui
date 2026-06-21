@@ -201,6 +201,7 @@ func main() {
 
 	for _, imagePath := range imagesToProcess {
 		baseName := filepath.Base(imagePath)
+		pb.Describe(baseName)
 
 		result, err := extractor.Extract(imagePath, useParameters)
 		if err != nil {
