@@ -135,16 +135,25 @@ func main() {
 		overrideEnabled: override,
 	}
 
-	fmt.Println("🎨 parq-comfyui (Go)")
-	fmt.Printf("Input: %s\n", input)
+	asciiArt := `    ____                           ______                      __  __  __  __
+   / __ \____ ______ ____ _       / ____/___  ____ ___  ____  / /_/ / / / / /
+  / /_/ / __ @/ ___// __ @/ ___  / /   / __ \/ __ @__ \/ __ \/ __/ / / / / / 
+ / ____/ /_/ / /   / /_/ / /___ / /___/ /_/ / / / / / / /_/ / /_/ /_/ /_/ /  
+/_/    \__,_/_/   \__,  /      \____/\____/_/ /_/ /_/ .___/\__/\____/\____/  
+                 /____/                             /_/                      `
+	asciiArt = strings.ReplaceAll(asciiArt, "@", "`")
+
+	fmt.Printf("\033[36m%s\033[0m\n\n", asciiArt)
+	fmt.Printf("\033[1;36m🎨 parq-comfyui (Go)\033[0m\n")
+	fmt.Printf("\033[90mInput:\033[0m %s\n", input)
 	if fileList != "" {
-		fmt.Printf("File list: %s\n", fileList)
+		fmt.Printf("\033[90mFile list:\033[0m %s\n", fileList)
 	}
-	fmt.Printf("Parquet database: %s\n", database)
-	fmt.Printf("Existing entries in database: %d\n", len(db.Entries))
-	fmt.Printf("Override existing: %v\n", override)
-	fmt.Println("\n💡 Tip: Press Ctrl-C anytime to save progress and exit gracefully")
-	fmt.Println(strings.Repeat("-", 60))
+	fmt.Printf("\033[90mParquet database:\033[0m %s\n", database)
+	fmt.Printf("\033[90mExisting entries in database:\033[0m \033[32m%d\033[0m\n", len(db.Entries))
+	fmt.Printf("\033[90mOverride existing:\033[0m %v\n", override)
+	fmt.Println("\n💡 \033[33mTip:\033[0m Press \033[1;33mCtrl-C\033[0m anytime to save progress and exit gracefully")
+	fmt.Println("\033[90m" + strings.Repeat("-", 60) + "\033[0m")
 
 	fmt.Printf("Found %d PNG file(s) total\n", len(allImageFiles))
 
@@ -256,31 +265,31 @@ func (s *appState) saveAndExit() {
 	if len(s.newEntries) > 0 {
 		s.db.AddEntries(s.newEntries, s.overrideEnabled)
 		if err := s.db.Save(); err != nil {
-			fmt.Printf("✗ Error saving database: %v\n", err)
+			fmt.Printf("\033[31m✗ Error saving database: %v\033[0m\n", err)
 			os.Exit(1)
 		} else {
-			fmt.Printf("✓ Database updated: %s\n", s.databasePath)
-			fmt.Printf("  New entries added: %d\n", len(s.newEntries))
-			fmt.Printf("  Total entries in database: %d\n", len(s.db.Entries))
+			fmt.Printf("\033[32m✓ Database updated:\033[0m %s\n", s.databasePath)
+			fmt.Printf("  New entries added: \033[32m%d\033[0m\n", len(s.newEntries))
+			fmt.Printf("  Total entries in database: \033[32m%d\033[0m\n", len(s.db.Entries))
 		}
 	} else {
-		fmt.Println("⊘ No new entries to save.")
+		fmt.Println("\033[90m⊘ No new entries to save.\033[0m")
 	}
 
-	fmt.Println(strings.Repeat("-", 60))
-	fmt.Println("Processing complete!")
-	fmt.Printf("✓ Successfully processed: %d\n", s.successCount)
+	fmt.Println("\033[90m" + strings.Repeat("-", 60) + "\033[0m")
+	fmt.Println("\033[1;36mProcessing complete!\033[0m")
+	fmt.Printf("\033[32m✓ Successfully processed:\033[0m %d\n", s.successCount)
 	if s.noPromptCount > 0 {
-		fmt.Printf("⚠ Images with no prompts found: %d\n", s.noPromptCount)
+		fmt.Printf("\033[33m⚠ Images with no prompts found:\033[0m %d\n", s.noPromptCount)
 	}
 	if s.skippedNoParam > 0 {
-		fmt.Printf("✓ Images skipped (no parameters found): %d\n", s.skippedNoParam)
+		fmt.Printf("\033[32m✓ Images skipped (no parameters found):\033[0m %d\n", s.skippedNoParam)
 	}
 	if s.errorCount > 0 {
-		fmt.Printf("✗ Errors: %d\n", s.errorCount)
+		fmt.Printf("\033[31m✗ Errors:\033[0m %d\n", s.errorCount)
 	}
 	if s.skippedCount > 0 {
-		fmt.Printf("⊘ Skipped (already in database): %d\n", s.skippedCount)
+		fmt.Printf("\033[90m⊘ Skipped (already in database):\033[0m %d\n", s.skippedCount)
 	}
 	
 	os.Exit(0)
