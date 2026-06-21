@@ -201,7 +201,6 @@ func main() {
 
 	for _, imagePath := range imagesToProcess {
 		baseName := filepath.Base(imagePath)
-		pb.Describe(baseName)
 
 		result, err := extractor.Extract(imagePath, useParameters)
 		if err != nil {
@@ -216,7 +215,7 @@ func main() {
 			state.mu.Lock()
 			state.skippedNoParam++
 			state.mu.Unlock()
-			pb.UpdateWithStatus(fmt.Sprintf("SKIP %s", baseName))
+			pb.Increment()
 			continue
 		}
 
