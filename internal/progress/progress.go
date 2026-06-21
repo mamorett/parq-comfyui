@@ -11,6 +11,7 @@ import (
 // ProgressBar wrapper for terminal progress
 type ProgressBar struct {
 	bar              *progressbar.ProgressBar
+	currentFile      string
 	lastRedraw       time.Time
 	throttleDuration time.Duration
 }
@@ -49,26 +50,30 @@ func NewProgressBar(total int, description string) *ProgressBar {
 func (pb *ProgressBar) UpdateWithStatus(status string) {
 	if status != "" {
 		_ = pb.bar.Clear()
+		fmt.Printf("\n\033[2K\033[A\r")
 		fmt.Println(status)
 	}
 	_ = pb.bar.Add(1)
+	fmt.Printf("\n\033[2K\033[90m⚙ Processing: %s\033[0m\033[A\r", pb.currentFile)
 	pb.lastRedraw = time.Now()
 }
 
 // Increment just increments the progress bar
 func (pb *ProgressBar) Increment() {
 	_ = pb.bar.Add(1)
+	if time.Since(pb.lastRedraw) >= pb.throttleDuration {
+		fmt.Printf("\n\033[2K\033[90m⚙ Processing: %s\033[0m\033[A\r", pb.currentFile)
+		pb.lastRedraw = time.Now()
+	}
 }
 
 // Describe sets the description without incrementing
 func (pb *ProgressBar) Describe(desc string) {
-	if time.Since(pb.lastRedraw) >= pb.throttleDuration {
-		pb.bar.Describe("[cyan]⚙ " + desc + "[reset]")
-		pb.lastRedraw = time.Now()
-	}
+	pb.currentFile = desc
 }
 
 // Finish finishes the progress bar
 func (pb *ProgressBar) Finish() {
 	_ = pb.bar.Finish()
+	fmt.Printf("\n\033[2K\033[A\r")
 }
