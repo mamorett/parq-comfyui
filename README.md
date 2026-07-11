@@ -22,7 +22,7 @@ Built for efficiency, it handles large datasets of images with ease, resolving c
 - **🚀 High Performance:** Written in Go for lightning-fast PNG metadata parsing and Parquet serialization.
 - **🧩 Deep ComfyUI Support:** Resolves node references in `prompt` JSON (handling `CLIPTextEncode`, `String`, `KepStringLiteral`, and more).
 - **📝 A1111 Compatibility:** Robust extraction from standard `parameters` chunks.
-- **📊 Parquet Storage:** Efficiently saves to Apache Parquet using Apache Arrow, making it easy to query with DuckDB, Pandas, or Spark.
+- **📊 Flexible Storage:** Efficiently saves to Apache Parquet or JSON Lines (JSONL), making it easy to query with DuckDB, Pandas, jq, or Spark.
 - **🎯 Idempotency:** Automatically skips already-processed images unless `--override` is specified.
 - **📦 Cross-Platform:** Pre-compiled binaries for Linux (amd64/arm64) and macOS (arm64).
 - **🛑 Graceful Shutdown:** Press `Ctrl+C` at any time; the application will save current progress to the database before exiting.
@@ -80,12 +80,28 @@ parq-comfyui -i /path/to/my/renders --database prompts.parquet
 | Flag | Shorthand | Description |
 |------|-----------|-------------|
 | `--input` | `-i` | Input directory, single file, or glob pattern (e.g., `*.png`) |
-| `--database` | `--db` | Path to the Parquet database file (Required) |
+| `--database` | `--db` | Path to the database file (Required) |
+| `--format` | | Database format: `parquet` or `jsonl` (Default: `parquet`, auto-detected if extension is `.jsonl` or `.json`) |
 | `--recursive` | `-r` | Search subdirectories recursively |
 | `--file-list` | `-f` | Process files listed in a text file |
 | `--override` | | Reprocess and update existing entries in the database |
 | `--use-parameters`| | Force A1111-style parameter extraction |
 | `--clean` | | Remove entries whose image files no longer exist on disk (requires `--input` or `--file-list`) |
+
+### Database Formats
+
+The database file format defaults to **Parquet**, but you can easily output to **JSON Lines (JSONL)** format.
+The application automatically detects the format from the file extension (e.g., `.jsonl` or `.json` triggers JSONL format), or you can explicitly specify the format using the `--format` flag.
+
+**Using JSONL format via auto-detection:**
+```bash
+parq-comfyui -i ./renders -db prompts.jsonl
+```
+
+**Using JSONL format via explicit flag:**
+```bash
+parq-comfyui -i ./renders -db prompts.db --format jsonl
+```
 
 ### Examples
 

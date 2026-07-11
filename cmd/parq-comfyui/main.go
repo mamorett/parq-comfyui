@@ -35,6 +35,7 @@ var (
 	usePrompt     bool
 	recursive     bool
 	clean         bool
+	format        string
 )
 
 func init() {
@@ -50,6 +51,7 @@ func init() {
 	flag.BoolVar(&recursive, "recursive", false, "Recursively search for images")
 	flag.BoolVar(&recursive, "r", false, "Recursive (shorthand)")
 	flag.BoolVar(&clean, "clean", false, "Remove entries whose image files no longer exist on disk")
+	flag.StringVar(&format, "format", "", "Output format: parquet or jsonl (default: parquet, auto-detected from file extension)")
 
 	flag.Usage = func() {
 		printLogo()
@@ -62,7 +64,8 @@ func init() {
 		fmt.Fprintf(os.Stderr, "  \033[36m--override\033[0m              Override existing entries in database\n")
 		fmt.Fprintf(os.Stderr, "  \033[36m--use-parameters\033[0m        A1111-style parameters extraction\n")
 		fmt.Fprintf(os.Stderr, "  \033[36m--use-prompt\033[0m            ComfyUI-style extraction (default)\n")
-		fmt.Fprintf(os.Stderr, "  \033[36m--clean\033[0m                 Remove stale database entries (files no longer exist on disk)\n\n")
+		fmt.Fprintf(os.Stderr, "  \033[36m--clean\033[0m                 Remove stale database entries (files no longer exist on disk)\n")
+		fmt.Fprintf(os.Stderr, "  \033[36m--format\033[0m \033[33m<format>\033[0m      Output format: parquet or jsonl (default: parquet, auto-detected from extension)\n\n")
 		fmt.Fprintf(os.Stderr, "\033[1mExamples:\033[0m\n")
 		fmt.Fprintf(os.Stderr, "  \033[90mparq-comfyui -i ./renders -db prompts.parquet\033[0m\n")
 		fmt.Fprintf(os.Stderr, "  \033[90mparq-comfyui -i \"*.png\" --db prompts.parquet --use-parameters\033[0m\n")
@@ -87,6 +90,12 @@ func main() {
 
 	if database == "" {
 		fmt.Println("\033[31m✗ Error: --database is required\033[0m")
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	if format != "" && format != "parquet" && format != "jsonl" {
+		fmt.Println("\033[31m✗ Error: --format must be 'parquet' or 'jsonl'\033[0m")
 		flag.Usage()
 		os.Exit(1)
 	}
@@ -122,6 +131,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	if format != "" {
+		db.Format = parquet.Format(format)
+	}
+
 	if clean {
 		removed := db.RemoveMissingEntries()
 		if removed > 0 {
@@ -152,7 +165,7 @@ func main() {
 	if fileList != "" {
 		fmt.Printf("\033[90mFile list:\033[0m %s\n", fileList)
 	}
-	fmt.Printf("\033[90mParquet database:\033[0m %s\n", database)
+	fmt.Printf("\033[90mDatabase:\033[0m %s (format: %s)\n", database, db.Format)
 	fmt.Printf("\033[90mExisting entries in database:\033[0m \033[32m%d\033[0m\n", len(db.Entries))
 	fmt.Printf("\033[90mOverride existing:\033[0m %v\n", override)
 	fmt.Println("\n💡 \033[33mTip:\033[0m Press \033[1;33mCtrl-C\033[0m anytime to save progress and exit gracefully")
