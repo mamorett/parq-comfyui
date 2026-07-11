@@ -1,24 +1,44 @@
 package parquet
 
 import (
+	"bufio"
+	"encoding/json"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	parquetgo "github.com/parquet-go/parquet-go"
 )
 
+type Format string
+
+const (
+	FormatParquet Format = "parquet"
+	FormatJSONL   Format = "jsonl"
+)
+
 type Entry struct {
-	ImagePath   string     `parquet:"image_path,snappy"`
-	Prompt      string     `parquet:"prompt,snappy"`
-	Description string     `parquet:"description,snappy"`
-	CreatedAt   time.Time  `parquet:"created_at"`
-	ModifiedAt  *time.Time `parquet:"modified_at"`
+	ImagePath   string     `parquet:"image_path,snappy" json:"image_path"`
+	Prompt      string     `parquet:"prompt,snappy" json:"prompt"`
+	Description string     `parquet:"description,snappy" json:"description"`
+	CreatedAt   time.Time  `parquet:"created_at" json:"created_at"`
+	ModifiedAt  *time.Time `parquet:"modified_at" json:"modified_at,omitempty"`
 }
 
 type ParquetDB struct {
 	Entries []Entry
 	index   map[string]int
 	Path    string
+	Format  Format
+}
+
+func detectFormat(path string) Format {
+	ext := strings.ToLower(filepath.Ext(path))
+	if ext == ".jsonl" || ext == ".json" {
+		return FormatJSONL
+	}
+	return FormatParquet
 }
 
 func (db *ParquetDB) buildIndex() {
@@ -33,14 +53,23 @@ func (db *ParquetDB) BuildIndexPublic() {
 }
 
 func LoadParquetDB(path string) (*ParquetDB, error) {
-	db := &ParquetDB{Path: path}
+	db := &ParquetDB{
+		Path:   path,
+		Format: detectFormat(path),
+	}
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		db.buildIndex()
 		return db, nil
 	}
 
-	rows, err := parquetgo.ReadFile[Entry](path)
+	var rows []Entry
+	var err error
+	if db.Format == FormatJSONL {
+		rows, err = readJSONLFile(path)
+	} else {
+		rows, err = parquetgo.ReadFile[Entry](path)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -48,6 +77,38 @@ func LoadParquetDB(path string) (*ParquetDB, error) {
 	db.Entries = rows
 	db.buildIndex()
 	return db, nil
+}
+
+func readJSONLFile(path string) ([]Entry, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var entries []Entry
+	scanner := bufio.NewScanner(file)
+	// Use a 10MB capacity buffer to prevent scanner token too long errors on large prompts
+	const maxCapacity = 10 * 1024 * 1024
+	buf := make([]byte, 64*1024)
+	scanner.Buffer(buf, maxCapacity)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var entry Entry
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			return nil, err
+		}
+		entries = append(entries, entry)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return entries, nil
 }
 
 func (db *ParquetDB) Save() error {
@@ -59,7 +120,13 @@ func (db *ParquetDB) Save() error {
 		}
 	}()
 
-	if err := parquetgo.WriteFile(tempPath, db.Entries); err != nil {
+	var err error
+	if db.Format == FormatJSONL {
+		err = writeJSONLFile(tempPath, db.Entries)
+	} else {
+		err = parquetgo.WriteFile(tempPath, db.Entries)
+	}
+	if err != nil {
 		return err
 	}
 
@@ -68,6 +135,29 @@ func (db *ParquetDB) Save() error {
 	}
 	ok = true
 	return nil
+}
+
+func writeJSONLFile(path string, entries []Entry) error {
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := bufio.NewWriter(file)
+	for _, entry := range entries {
+		data, err := json.Marshal(entry)
+		if err != nil {
+			return err
+		}
+		if _, err := writer.Write(data); err != nil {
+			return err
+		}
+		if _, err := writer.Write([]byte("\n")); err != nil {
+			return err
+		}
+	}
+	return writer.Flush()
 }
 
 func (db *ParquetDB) Exists(imagePath string) bool {
@@ -116,3 +206,4 @@ func (db *ParquetDB) AddEntries(newEntries []Entry, override bool) {
 		}
 	}
 }
+

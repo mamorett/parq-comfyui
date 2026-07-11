@@ -257,3 +257,45 @@ func TestParquetStressLarge(t *testing.T) {
 	require.True(t, ok)
 	require.Contains(t, e0.Prompt, "prompt text number 0")
 }
+
+func TestJSONLSaveLoad(t *testing.T) {
+	tempFile := "/tmp/test_basic.jsonl"
+	os.Remove(tempFile)
+	os.Remove(tempFile + ".tmp")
+	defer os.Remove(tempFile)
+
+	now := time.Now().Truncate(time.Second)
+	entries := []Entry{
+		{ImagePath: "test1.png", Prompt: "prompt1", Description: "desc1", CreatedAt: now},
+		{ImagePath: "test2.png", Prompt: "prompt2", Description: "desc2", CreatedAt: now, ModifiedAt: &now},
+	}
+
+	db := &ParquetDB{Entries: entries, Path: tempFile, Format: FormatJSONL}
+	db.buildIndex()
+
+	err := db.Save()
+	assert.NoError(t, err)
+
+	loadedDB, err := LoadParquetDB(tempFile)
+	assert.NoError(t, err)
+	assert.Equal(t, FormatJSONL, loadedDB.Format)
+	assert.Len(t, loadedDB.Entries, 2)
+	assert.Equal(t, "test1.png", loadedDB.Entries[0].ImagePath)
+	assert.Equal(t, "prompt1", loadedDB.Entries[0].Prompt)
+	assert.Equal(t, "desc1", loadedDB.Entries[0].Description)
+	assert.True(t, now.Equal(loadedDB.Entries[0].CreatedAt))
+	assert.Nil(t, loadedDB.Entries[0].ModifiedAt)
+	assert.Equal(t, "test2.png", loadedDB.Entries[1].ImagePath)
+	assert.NotNil(t, loadedDB.Entries[1].ModifiedAt)
+	assert.True(t, now.Equal(*loadedDB.Entries[1].ModifiedAt))
+}
+
+func TestJSONLAutoDetect(t *testing.T) {
+	assert.Equal(t, FormatJSONL, detectFormat("test.jsonl"))
+	assert.Equal(t, FormatJSONL, detectFormat("test.JSONL"))
+	assert.Equal(t, FormatJSONL, detectFormat("test.json"))
+	assert.Equal(t, FormatParquet, detectFormat("test.parquet"))
+	assert.Equal(t, FormatParquet, detectFormat("test.parq"))
+	assert.Equal(t, FormatParquet, detectFormat("test.db"))
+}
+
