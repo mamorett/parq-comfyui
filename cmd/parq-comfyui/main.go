@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"flag"
 	"fmt"
 	"os"
@@ -10,20 +11,34 @@ import (
 	"sync"
 	"time"
 
+	"github.com/blacktop/go-termimg"
 	"github.com/trithemius/parq-comfyui/internal/collector"
 	"github.com/trithemius/parq-comfyui/internal/extractor"
 	"github.com/trithemius/parq-comfyui/internal/parquet"
 	"github.com/trithemius/parq-comfyui/internal/progress"
 )
 
-var rawAsciiArt = `  ____   _    ____   ___       ____ ___  __  __ _____ __   __ _   _ ___ 
- |  _ \ / \  |  _ \ / _ \     / ___/ _ \|  \/  |  ___|\ \ / /| | | |_ _|
- | |_) / _ \ | |_) | | | |   | |  | | | | |\/| | |_    \ V / | | | || | 
- |  __/ ___ \|  _ <| |_| |   | |__| |_| | |  | |  _|    | |  | |_| || | 
- |_| /_/   \_\_| \_\\__\_\    \____\___/|_|  |_|_|      |_|   \___/|___|`
+//go:embed logo.png
+var logoBytes []byte
 
 func printLogo() {
-	fmt.Printf("\033[36m%s\033[0m\n\n", rawAsciiArt)
+	tmpFile, err := os.CreateTemp("", "parq-comfyui-logo-*.png")
+	if err != nil {
+		return
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.Write(logoBytes); err != nil {
+		tmpFile.Close()
+		return
+	}
+	tmpFile.Close()
+
+	img, err := termimg.Open(tmpFile.Name())
+	if err == nil {
+		img.Width(60).Height(25).Print()
+		fmt.Println()
+	}
 }
 
 var (
@@ -320,6 +335,6 @@ func (s *appState) saveAndExit() {
 	if s.skippedCount > 0 {
 		fmt.Printf("\033[90m⊘ Skipped (already in database):\033[0m %d\n", s.skippedCount)
 	}
-	
+
 	os.Exit(0)
 }

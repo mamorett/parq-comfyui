@@ -1,12 +1,5 @@
-# 🎨 parq-comfyui
 
-```
-  ____   _    ____   ___       ____ ___  __  __ _____ __   __ _   _ ___ 
- |  _ \ / \  |  _ \ / _ \     / ___/ _ \|  \/  |  ___|\ \ / /| | | |_ _|
- | |_) / _ \ | |_) | | | |   | |  | | | | |\/| | |_    \ V / | | | || | 
- |  __/ ___ \|  _ <| |_| |   | |__| |_| | |  | |  _|    | |  | |_| || | 
- |_| /_/   \_\_| \_\\__\_\    \____\___/|_|  |_|_|      |_|   \___/|___|
-```
+<img src="logo.png" alt="parq-comfyui logo" width="250" />
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/mamorett/parq-comfyui)](https://goreportcard.com/report/github.com/mamorett/parq-comfyui)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
