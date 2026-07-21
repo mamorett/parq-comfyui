@@ -36,6 +36,7 @@ var (
 	recursive     bool
 	clean         bool
 	format        string
+	useFileTime   bool
 )
 
 func init() {
@@ -48,6 +49,7 @@ func init() {
 	flag.BoolVar(&override, "override", false, "Override existing entries in database")
 	flag.BoolVar(&useParameters, "use-parameters", false, "Use A1111/parameters-style extraction")
 	flag.BoolVar(&usePrompt, "use-prompt", false, "Use ComfyUI prompt/workflow extraction (default)")
+	flag.BoolVar(&useFileTime, "use-file-time", false, "Set the entry created date time as the actual file creation date time")
 	flag.BoolVar(&recursive, "recursive", false, "Recursively search for images")
 	flag.BoolVar(&recursive, "r", false, "Recursive (shorthand)")
 	flag.BoolVar(&clean, "clean", false, "Remove entries whose image files no longer exist on disk")
@@ -64,6 +66,7 @@ func init() {
 		fmt.Fprintf(os.Stderr, "  \033[36m--override\033[0m              Override existing entries in database\n")
 		fmt.Fprintf(os.Stderr, "  \033[36m--use-parameters\033[0m        A1111-style parameters extraction\n")
 		fmt.Fprintf(os.Stderr, "  \033[36m--use-prompt\033[0m            ComfyUI-style extraction (default)\n")
+		fmt.Fprintf(os.Stderr, "  \033[36m--use-file-time\033[0m         Set the entry created date time as the actual file creation date time\n")
 		fmt.Fprintf(os.Stderr, "  \033[36m--clean\033[0m                 Remove stale database entries (files no longer exist on disk)\n")
 		fmt.Fprintf(os.Stderr, "  \033[36m--format\033[0m \033[33m<format>\033[0m      Output format: parquet or jsonl (default: parquet, auto-detected from extension)\n\n")
 		fmt.Fprintf(os.Stderr, "\033[1mExamples:\033[0m\n")
@@ -168,6 +171,7 @@ func main() {
 	fmt.Printf("\033[90mDatabase:\033[0m %s (format: %s)\n", database, db.Format)
 	fmt.Printf("\033[90mExisting entries in database:\033[0m \033[32m%d\033[0m\n", len(db.Entries))
 	fmt.Printf("\033[90mOverride existing:\033[0m %v\n", override)
+	fmt.Printf("\033[90mUse file creation time:\033[0m %v\n", useFileTime)
 	fmt.Println("\n💡 \033[33mTip:\033[0m Press \033[1;33mCtrl-C\033[0m anytime to save progress and exit gracefully")
 	fmt.Println("\033[90m" + strings.Repeat("-", 60) + "\033[0m")
 
@@ -249,15 +253,24 @@ func main() {
 		}
 
 		now := time.Now()
+		createdAt := now
+		if useFileTime {
+			if fTime, err := parquet.GetFileCreationTime(imagePath); err == nil {
+				createdAt = fTime
+			}
+		}
+
 		entry := parquet.Entry{
 			ImagePath:   imagePath,
 			Prompt:      "",
 			Description: promptText,
-			CreatedAt:   now,
+			CreatedAt:   createdAt,
 		}
 
 		if existing, ok := existingEntriesMap[imagePath]; ok {
-			entry.CreatedAt = existing.CreatedAt
+			if !useFileTime {
+				entry.CreatedAt = existing.CreatedAt
+			}
 			entry.ModifiedAt = &now
 		}
 

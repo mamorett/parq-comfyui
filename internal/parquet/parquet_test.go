@@ -3,6 +3,7 @@ package parquet
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -298,4 +299,22 @@ func TestJSONLAutoDetect(t *testing.T) {
 	assert.Equal(t, FormatParquet, detectFormat("test.parq"))
 	assert.Equal(t, FormatParquet, detectFormat("test.db"))
 }
+
+func TestGetFileCreationTime(t *testing.T) {
+	tempFile := filepath.Join(t.TempDir(), "test_file.txt")
+	err := os.WriteFile(tempFile, []byte("hello"), 0644)
+	require.NoError(t, err)
+
+	creationTime, err := GetFileCreationTime(tempFile)
+	require.NoError(t, err)
+	assert.False(t, creationTime.IsZero())
+
+	// Creation/birth time should be around now (within a few seconds)
+	assert.WithinDuration(t, time.Now(), creationTime, 5*time.Second)
+
+	// Test non-existent file
+	_, err = GetFileCreationTime(tempFile + "_does_not_exist")
+	assert.Error(t, err)
+}
+
 

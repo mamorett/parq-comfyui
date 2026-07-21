@@ -86,6 +86,7 @@ parq-comfyui -i /path/to/my/renders --database prompts.parquet
 | `--file-list` | `-f` | Process files listed in a text file |
 | `--override` | | Reprocess and update existing entries in the database |
 | `--use-parameters`| | Force A1111-style parameter extraction |
+| `--use-file-time` | | Set the entry created date time as the actual file creation date time |
 | `--clean` | | Remove entries whose image files no longer exist on disk (requires `--input` or `--file-list`) |
 
 ### Database Formats
